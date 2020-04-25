@@ -28,18 +28,38 @@ void mybeep();
 bool
 CmdParser::openDofile(const string& dof)
 {
-   // TODO...
-   _dofile = new ifstream(dof.c_str());
+
+   ifstream* tmp = new ifstream(dof.c_str());
+   if(!tmp-> is_open())
+   {
+      if(_dofileStack.size()!= 0)  
+        _dofile = _dofileStack.top();
+      else 
+        _dofile = 0;
+      return false;         
+   }
+   _dofileStack.push(tmp);
+   _dofile = tmp;
    return true;
+  
 }
 
 // Must make sure _dofile != 0
 void
 CmdParser::closeDofile()
 {
-   assert(_dofile != 0);
+
+  assert(_dofile != 0);
+
    // TODO...
-   delete _dofile;
+   _dofile->close();
+   delete _dofile;   
+   _dofileStack.pop();
+
+   if(!_dofileStack.empty())
+      _dofile = _dofileStack.top();
+   else _dofile = NULL;
+ 
 }
 
 // Return false if registration fails
@@ -86,8 +106,10 @@ CmdParser::execOneCmd()
    if (newCmd) {
       string option;
       CmdExec* e = parseCmd(option);
+      
       if (e != 0)
          return e->exec(option);
+      
    }
    return CMD_EXEC_NOP;
 }
@@ -98,6 +120,11 @@ void
 CmdParser::printHelps() const
 {
    // TODO...
+
+  for(auto i = _cmdMap.begin(); i != _cmdMap.end();i++)
+     (*i).second->help(); 
+  cout << endl;     
+   
 }
 
 void
@@ -132,169 +159,126 @@ CmdParser::printHistory(int nPrint) const
 //    words and beyond) and store them in "option"
 //
 CmdExec*
-CmdParser::parseCmd(string& option)
+CmdParser::parseCmd(string& option)// option contain no first space
 {
+  
    assert(_tempCmdStored == false);
    assert(!_history.empty());
    string str = _history.back();
-
    // TODO...
    assert(str[0] != 0 && str[0] != ' ');
-   return NULL;
+
+   string token;
+   myStrGetTok(str,token);
+   CmdExec* back;
+   back = getCmd(token);
+
+   if(back == 0)
+   {
+      cerr << "Illegal command!! (" << token << ")" << endl;
+      return NULL;
+   }
+   else
+    option = str.erase(0,token.size()+1);
+
+   return back;
 }
 
-// Remove this function for TODO...
-//
-// This function is called by pressing 'Tab'.
-// It is to list the partially matched commands.
-// "str" is the partial string before current cursor position. It can be 
-// a null string, or begin with ' '. The beginning ' ' will be ignored.
-//
-// Several possibilities after pressing 'Tab'
-// (Let $ be the cursor position)
-// 1. LIST ALL COMMANDS
-//    --- 1.1 ---
-//    [Before] Null cmd
-//    cmd> $
-//    --- 1.2 ---
-//    [Before] Cmd with ' ' only
-//    cmd>     $
-//    [After Tab]
-//    ==> List all the commands, each command is printed out by:
-//           cout << setw(12) << left << cmd;
-//    ==> Print a new line for every 5 commands
-//    ==> After printing, re-print the prompt and place the cursor back to
-//        original location (including ' ')
-//
-// 2. LIST ALL PARTIALLY MATCHED COMMANDS
-//    --- 2.1 ---
-//    [Before] partially matched (multiple matches)
-//    cmd> h$                   // partially matched
-//    [After Tab]
-//    HELp        HIStory       // List all the parially matched commands
-//    cmd> h$                   // and then re-print the partial command
-//    --- 2.2 ---
-//    [Before] partially matched (multiple matches)
-//    cmd> h$llo                // partially matched with trailing characters
-//    [After Tab]
-//    HELp        HIStory       // List all the parially matched commands
-//    cmd> h$llo                // and then re-print the partial command
-//
-// 3. LIST THE SINGLY MATCHED COMMAND
-//    ==> In either of the following cases, print out cmd + ' '
-//    ==> and reset _tabPressCount to 0
-//    --- 3.1 ---
-//    [Before] partially matched (single match)
-//    cmd> he$
-//    [After Tab]
-//    cmd> heLp $               // auto completed with a space inserted
-//    --- 3.2 ---
-//    [Before] partially matched with trailing characters (single match)
-//    cmd> he$ahah
-//    [After Tab]
-//    cmd> heLp $ahaha
-//    ==> Automatically complete on the same line
-//    ==> The auto-expanded part follow the strings stored in cmd map and
-//        cmd->_optCmd. Insert a space after "heLp"
-//    --- 3.3 ---
-//    [Before] fully matched (cursor right behind cmd)
-//    cmd> hElP$sdf
-//    [After Tab]
-//    cmd> hElP $sdf            // a space character is inserted
-//
-// 4. NO MATCH IN FITST WORD
-//    --- 4.1 ---
-//    [Before] No match
-//    cmd> hek$
-//    [After Tab]
-//    ==> Beep and stay in the same location
-//
-// 5. FIRST WORD ALREADY MATCHED ON FIRST TAB PRESSING
-//    --- 5.1 ---
-//    [Before] Already matched on first tab pressing
-//    cmd> help asd$gh
-//    [After] Print out the usage for the already matched command
-//    Usage: HELp [(string cmd)]
-//    cmd> help asd$gh
-//
-// 6. FIRST WORD ALREADY MATCHED ON SECOND AND LATER TAB PRESSING
-//    ==> Note: command usage has been printed under first tab press
-//    ==> Check the word the cursor is at; get the prefix before the cursor
-//    ==> So, this is to list the file names under current directory that
-//        match the prefix
-//    ==> List all the matched file names alphabetically by:
-//           cout << setw(16) << left << fileName;
-//    ==> Print a new line for every 5 commands
-//    ==> After printing, re-print the prompt and place the cursor back to
-//        original location
-//    Considering the following cases in which prefix is empty:
-//    --- 6.1.1 ---
-//    [Before] if prefix is empty, and in this directory there are multiple
-//             files and they do not have a common prefix,
-//    cmd> help $sdfgh
-//    [After] print all the file names
-//    .               ..              Homework_3.docx Homework_3.pdf  Makefile
-//    MustExist.txt   MustRemove.txt  bin             dofiles         include
-//    lib             mydb            ref             src             testdb
-//    cmd> help $sdfgh
-//    --- 6.1.2 ---
-//    [Before] if prefix is empty, and in this directory there are multiple
-//             files and all of them have a common prefix,
-//    cmd> help $orld
-//    [After]
-//    ==> auto insert the common prefix and make a beep sound
-//    // e.g. in hw3/ref
-//    cmd> help mydb-$orld
-//    ==> DO NOT print the matched files
-//    ==> If "tab" is pressed again, see 6.2
-//    --- 6.1.3 ---
-//    [Before] if prefix is empty, and only one file in the current directory
-//    cmd> help $ydb
-//    [After] print out the single file name followed by a ' '
-//    // e.g. in hw3/bin
-//    cmd> help mydb $
-//    ==> If "tab" is pressed again, make a beep sound and DO NOT re-print 
-//        the singly-matched file
-//    --- 6.2 ---
-//    [Before] with a prefix and with mutiple matched files
-//    cmd> help M$Donald
-//    [After]
-//    Makefile        MustExist.txt   MustRemove.txt
-//    cmd> help M$Donald
-//    --- 6.3 ---
-//    [Before] with a prefix and with mutiple matched files,
-//             and these matched files have a common prefix
-//    cmd> help Mu$k
-//    [After]
-//    ==> auto insert the common prefix and make a beep sound
-//    ==> DO NOT print the matched files
-//    cmd> help Must$k
-//    --- 6.4 ---
-//    [Before] with a prefix and with a singly matched file
-//    cmd> help MustE$aa
-//    [After] insert the remaining of the matched file name followed by a ' '
-//    cmd> help MustExist.txt $aa
-//    ==> If "tab" is pressed again, make a beep sound and DO NOT re-print 
-//        the singly-matched file
-//    --- 6.5 ---
-//    [Before] with a prefix and NO matched file
-//    cmd> help Ye$kk
-//    [After] beep and stay in the same location
-//    cmd> help Ye$kk
-//
-//    [Note] The counting of tab press is reset after "newline" is entered.
-//
-// 7. FIRST WORD NO MATCH
-//    --- 7.1 ---
-//    [Before] Cursor NOT on the first word and NOT matched command
-//    cmd> he haha$kk
-//    [After Tab]
-//    ==> Beep and stay in the same location
 void
 CmdParser::listCmd(const string& str)
 {
-   // TODO...
+  // TODO...
+  string cursor_str;
+  size_t end = myStrGetTok(str,cursor_str);
+  string s1;
+  vector <string> multi_match;
+  
+
+  if(str.find_first_not_of(' ') == string::npos)//case 1  print-all
+  {  
+      cout << endl;
+      cout << setw(12) << left << "DBAPpend";
+      cout << setw(12) << left << "DBAVerage";
+      cout << setw(12) << left << "DBCount";
+      cout << setw(12) << left << "DBMAx";
+      cout << setw(12) << left << "DBMIn" <<endl;
+      cout << setw(12) << left << "DBPrint";
+      cout << setw(12) << left << "DBRead";
+      cout << setw(12) << left << "DBSOrt";
+      cout << setw(12) << left << "DBSUm";
+      cout << setw(12) << left << "DOfile" <<endl;     
+      cout << setw(12) << left << "HELp";
+      cout << setw(12) << left << "HIStory";
+      cout << setw(12) << left << "Quit" ;
+      _tabPressCount = 0;
+      reprintCmd();    
+  }
+  else if (getCmd(cursor_str))//case 5 6
+  {
+    //already _tabPressCount++ on I donnot know where
+    if(str.find(' ') != string::npos && _tabPressCount == 1)//case 5 usage
+    {          
+      cout << endl;                   
+      getCmd(cursor_str)->usage(cout);
+        reprintCmd(); 
+    }
+    else if(str.find(' ') != string::npos && _tabPressCount > 1) // case 6
+    {
+
+
+
+    }  
+    
+
+  }
+  else //case 2 3 4 7 (4 & 7 beep)
+  {
+    bool case_sev = false;
+    if(str.at(str.size()-1) == ' ')
+      case_sev = true;
+
+    for(CmdMap::iterator i = _cmdMap.begin(); i != _cmdMap.end(); i++)
+		{    
+      s1 = (*i).first + (*i).second -> getOptCmd(); 
+      
+      if(myStrNCmp(s1,cursor_str,cursor_str.size()) == 0)
+        multi_match.push_back(s1);
+    }
+
+    if(multi_match.size() > 1) // case 2 multi match
+    {
+      for(size_t i = 0;i < multi_match.size();i++)
+			{
+        if(i % 5 == 0)
+          cout << endl;
+        cout << setw(12) << left << multi_match.at(i);
+      }
+      _tabPressCount = 0;
+      reprintCmd();
+    }
+    else if(multi_match.size() == 1)// case 3 only one match // && case 7
+    {
+      if(!case_sev)
+      {
+        string sub_str =  multi_match.at(0).substr(cursor_str.size());
+        for(size_t i = 0; i < sub_str.size(); i++)
+          insertChar(sub_str[i]);
+        insertChar(' ');
+      }
+      else // case 7
+          mybeep();
+
+    }
+    else if((multi_match.size() == 0)) // case 4
+      mybeep();
+
+    multi_match.clear(); // need or not?
+    s1.clear();
+    _tabPressCount = 0;
+  }
+  
 }
+
 
 // cmd is a copy of the original input
 //
@@ -312,7 +296,19 @@ CmdParser::getCmd(string cmd)
 {
    CmdExec* e = 0;
    // TODO...
-   return e;
+   string s1;
+   string cmd_second;
+   int count = 0;
+
+  for(CmdMap::iterator i = _cmdMap.begin(); i != _cmdMap.end();i++)
+  {
+    s1 = (*i).first + (*i).second -> getOptCmd();
+    count = (*i).first.size();
+    if(!myStrNCmp(s1, cmd, count))
+      e = (*i).second; 
+    s1.clear();
+  }
+  return e;
 }
 
 

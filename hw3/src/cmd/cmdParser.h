@@ -75,7 +75,7 @@ public:
 
    void setOptCmd(const string& str) { _optCmd = str; }
    const string& getOptCmd() const { return _optCmd; }
-
+   
 protected:
    bool lexNoOption(const string&) const;
    bool lexSingleOption(const string&, string&, bool optional = true) const;

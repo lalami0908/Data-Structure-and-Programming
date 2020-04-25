@@ -78,10 +78,143 @@ MTResetCmd::help() const
 CmdExecStatus
 MTNewCmd::exec(const string& option)
 {
-   // TODO
+//TODO
+try{
+        int temp = 0;
+        int times = 0;
+        vector<string>options;
+        if (!CmdExec::lexOptions(option, options, 0))
+                return CMD_EXEC_ERROR;
+        if(options.size() == 0)
+                return CmdExec::errorOption(CMD_OPT_MISSING,"");
+
+   if(myStr2Int(options[0],temp) && temp > 0)
+   {
+        
+        if(options.size() == 1)
+        {
+                mtest.newObjs(temp);
+                return CMD_EXEC_DONE;
+        }
+        times = temp;
+
+        if(!myStrNCmp("-array", options[1],2))
+        {
+                if(options.size() == 2)
+                {
+                        cerr << "Error: Missing option after (" << options[1] << ")!!"<<  endl;
+                        return CMD_EXEC_ERROR;
+                }
+                if(myStr2Int(options[2],temp) && temp > 0)
+                {
+                   if(options.size()== 3)
+                   {    
+                        mtest.newArrs(times,temp);
+                        return CMD_EXEC_DONE;
+                   }
+                   else
+                   {
+                        return CmdExec::errorOption(CMD_OPT_EXTRA,options[3]); 
+                   }
+                }
+                else
+                {
+                   return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[2]);
+                }
+        }
+        else
+        {
+                return CmdExec::errorOption(CMD_OPT_EXTRA ,options[1]);
+        }
+
+   }
+   else if(!myStrNCmp("-array", options[0],2))
+   {
+        if(options.size() == 1)
+        {
+                cerr << "Error: Missing option after (" << options[0] << ")!!"<<  endl;
+                return CMD_EXEC_ERROR;
+        }
+        if(myStr2Int(options[1],temp) && temp > 0)
+        {
+                if(options.size()==2)
+                        return CmdExec::errorOption(CMD_OPT_MISSING,"");
+                if(myStr2Int(options[2],times) && times >= 0)
+                {
+                        if(options.size() == 3)
+                        {
+                                mtest.newArrs(times,temp);
+                                return CMD_EXEC_DONE;
+                        }
+                        else   
+                                return CmdExec::errorOption(CMD_OPT_EXTRA,options[3]);
+                }
+                else
+                {
+                        return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[2]);       
+                }
+        }
+        else
+        {
+                return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[1]);
+        }
+   }
+   else
+        return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[0]);
+}
+catch(const bad_alloc& e)
+{
+  return CMD_EXEC_ERROR;
+}
+return CMD_EXEC_DONE;
+//////////////////////
+  
+
+/*
+  int numObj= 0;
+  int temp = 0;
+  int arrSize = 0;
+  bool IsArray = false;
+  
+
+  else 
+  {
+        for (int i = 0;i < options.size();i++)
+        {
+                if (!myStrNCmp("-Array", options[i],2) &&!IsArray)
+                        IsArray = true;
+                else if (myStr2Int(options[i],temp)&& temp > 0)
+                {
+                
+                        if (IsArray && arrSize == 0)
+                        arrSize = temp;
+                        else
+                        numObj = temp;
+                }
+                else if (temp == 0) //???
+                 return CmdExec::errorOption(CMD_OPT_ILLEGAL, options[i]);
+                else
+                 return CmdExec::errorOption(CMD_OPT_ILLEGAL, options[i]);
+        }
+        try
+        {
+                if(IsArray)
+                {
+                  mtest.newArrs(numObj, arrSize);
+                }
+                else
+                  mtest.newObjs(numObj);
+                
+        }
+        catch(bad_alloc)
+        {
+                return CMD_EXEC_ERROR;
+        }
+   }*/
+//return CMD_EXEC_DONE;
 
    // Use try-catch to catch the bad_alloc exception
-   return CMD_EXEC_DONE;
+   
 }
 
 void
@@ -104,7 +237,190 @@ MTNewCmd::help() const
 CmdExecStatus
 MTDeleteCmd::exec(const string& option)
 {
-   // TODO
+
+// TODO
+  int temp;
+  vector<string>options;
+   if (!CmdExec::lexOptions(option, options, 0))
+      return CMD_EXEC_ERROR;
+  //cout << endl << options.size() << endl;
+   if(options.size() == 0)
+        return CmdExec::errorOption(CMD_OPT_MISSING,"");
+   
+   if(!myStrNCmp("-Random", options[0],2))
+   {
+        if(options.size()== 1)
+        {
+             cerr << "Error: Missing option after (" << options[0] << ")!!"<<  endl;
+             return CMD_EXEC_ERROR;
+        }
+        if(myStr2Int(options[1],temp) && temp >= 0)
+        {
+           if(options.size() == 2) //-r 2
+           {
+                if(mtest.getObjListSize() == 0)
+                {
+                        cerr << "Size of object list is 0!!" << endl;
+                        return CmdExec::errorOption(CMD_OPT_ILLEGAL,options[0]);
+
+                }
+                else
+                {
+                        for(int i = 0; i < temp; i++)
+                        {
+                           int r = rnGen(((int)mtest.getObjListSize()));
+                           mtest.deleteObj(r); 
+                        }
+                        return CMD_EXEC_DONE;
+                }
+           }
+           else
+           {
+                if(!myStrNCmp("-array", options[2],2)) //-r 2 -a
+                {
+                        if(mtest.getArrListSize() == 0)
+                        {
+                           cerr << "Size of array list is 0!!" << endl;
+                           return CmdExec::errorOption(CMD_OPT_ILLEGAL,options[0]);
+
+                        }
+                        else
+                        {
+                                for(int i = 0; i < temp; i++)
+                                {
+                                        int r = rnGen(((int)mtest.getArrListSize()));
+                                        mtest.deleteArr(r); 
+                                }
+                        }
+                           //randommmmmmm array ??
+                }
+                else // -r 23 -r
+                   return CmdExec::errorOption(CMD_OPT_EXTRA,options[2]);
+           }           
+        }
+        else
+           return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[1]);
+   }
+   else if(!myStrNCmp("-Index", options[0],2))
+   {
+        if(options.size()== 1)
+        {
+             cerr << "Error: Missing option after (" << options[0] << ")!!"<<  endl;
+             return CMD_EXEC_ERROR;
+        }
+        if(myStr2Int(options[1],temp) && temp >= 0)
+        {
+           if(options.size() == 3)
+           {
+                if(!myStrNCmp("-array", options[2],2))
+                {
+                        if(temp < (int)mtest.getArrListSize())
+                                mtest.deleteArr(temp);
+                        else//?? = 0
+                        {
+                           cerr << "Size of array list (" << mtest.getArrListSize() << ") is <= " << temp << "!!" << endl;
+                           return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[1]);
+                        }
+                }
+                else
+                   return CmdExec::errorOption(CMD_OPT_ILLEGAL,options[2]);
+           }       
+           else if(options.size() == 2) // -i 3
+           {
+                if(temp < (int)mtest.getObjListSize())
+                        mtest.deleteObj(temp);
+                else
+                {
+                        cerr << "Size of object list (" << mtest.getObjListSize() << ") is <= " << temp << "!!" << endl;
+                        return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[1]);
+                }
+           
+           }
+           else
+                return CmdExec::errorOption(CMD_OPT_ILLEGAL,options[3]);
+        }
+        else
+           return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[1]);
+   }        
+   else if(!myStrNCmp("-Array", options[0],2))
+   {
+        if(options.size()== 1)
+           return CmdExec::errorOption(CMD_OPT_MISSING,"");  
+
+        if(!myStrNCmp("-Index", options[1],2))
+        {
+           if(options.size()== 2)
+           {        
+             cerr << "Error: Missing option after (" << options[1] << ")!!"<<  endl;
+             return CMD_EXEC_ERROR;
+           }
+           if(myStr2Int(options[2],temp) && temp >= 0)
+           {
+                if(options.size()== 3)
+                {
+                                
+                        if(temp < (int)mtest.getArrListSize())// 0 ! < 0 
+                                mtest.deleteArr(temp);
+                        else
+                        {
+                           cerr << "Size of array list (" << mtest.getArrListSize() << ") is <= " << temp << "!!" << endl;
+                           return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[2]);
+                        }
+                        
+                }
+                else
+                   return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[3]);
+
+
+           }
+           else
+              return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[2]);
+        }
+        else if(!myStrNCmp("-Random", options[1],2))
+        {
+                if(options.size() == 2)
+                {
+                        cerr << "Error: Missing option after (" << options[1] << ")!!"<<  endl;
+                        return CMD_EXEC_ERROR;
+
+                }
+
+                if(myStr2Int(options[2],temp) && temp >= 0)
+                {
+                
+                        
+                        if(options.size() == 3)//-a -r 3
+                        {
+                           if(mtest.getArrListSize() == 0)
+                           {
+                               cerr << "Size of array list is 0!!" << endl;
+                                return CmdExec::errorOption(CMD_OPT_ILLEGAL,options[1]);
+                           }
+                                //-a -r temp
+                           for(int i = 0; i < temp; i++)
+                           {
+                               int r = rnGen(((int)mtest.getArrListSize()));
+                               mtest.deleteArr(r);
+                                
+                           }
+                        }
+                        else
+                        {
+                           return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[3]);       
+                        }
+                }
+                else
+                {
+                        return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[2]);
+                }
+        }
+        else
+           return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[1]); 
+   }
+   else
+        return CmdExec::errorOption(CMD_OPT_ILLEGAL ,options[0]);
+
+  
 
    return CMD_EXEC_DONE;
 }

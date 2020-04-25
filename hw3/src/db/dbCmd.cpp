@@ -20,6 +20,17 @@ bool
 initDbCmd()
 {
    // TODO...
+
+   cmdMgr->regCmd("DBAPpend", 4, new DBAppendCmd);
+   cmdMgr->regCmd("DBAVerage", 4, new DBAveCmd);
+   cmdMgr->regCmd("DBCount", 3, new DBCountCmd);
+   cmdMgr->regCmd("DBMAx", 4, new DBMaxCmd);
+   cmdMgr->regCmd("DBMIn", 4, new DBMinCmd);
+   cmdMgr->regCmd("DBPrint", 3, new DBPrintCmd);
+   cmdMgr->regCmd("DBRead", 3, new DBReadCmd);
+   cmdMgr->regCmd("DBSOrt", 4, new DBSortCmd);
+   cmdMgr->regCmd("DBSUm", 4, new DBSumCmd);
+
    return true;
 }
 
@@ -31,6 +42,36 @@ DBAppendCmd::exec(const string& option)
 {
    // TODO...
    // check option
+
+   vector<string> options;
+
+   if(!dbjson)
+   {
+        cerr << "Error: DB is not created yet!!" << endl;     
+        return CMD_EXEC_DONE;
+   }   
+
+
+   if(!CmdExec::lexOptions(option, options))
+      return CMD_EXEC_ERROR;
+   else if(options.size() <= 1 )
+      return CmdExec::errorOption(CMD_OPT_MISSING, "");
+   else if(options.size() > 2 )
+      return CmdExec::errorOption(CMD_OPT_EXTRA,options[2]);
+
+  
+
+ 
+        int value = 0; 
+        if(isValidVarName(options.at(0)) && myStr2Int(options.at(1),value))
+        {
+                DBJsonElem get(options.at(0), value);
+                if(!dbjson.add(get))
+                      cerr << "Error: Element with key \"" << options.at(0) << "\" already exists!!" << endl; 
+        } 
+        else
+                cerr << "Error: Illegal option!! (" << options.at(1) << ")" << endl;
+
 
    return CMD_EXEC_DONE;
 }
@@ -127,6 +168,7 @@ DBCountCmd::help() const
 CmdExecStatus
 DBMaxCmd::exec(const string& option)
 {  
+        
    // check option
    if (!CmdExec::lexNoOption(option))
       return CMD_EXEC_ERROR;
@@ -137,7 +179,9 @@ DBMaxCmd::exec(const string& option)
       cerr << "Error: The max JSON element is nan." << endl;
       return CMD_EXEC_ERROR;
    }
-   cout << "The max JSON element is { " << dbjson[maxI] << " }." << endl;
+   
+
+    cout << "The max JSON element is { " << dbjson[maxI] << " }." << endl;
 
    return CMD_EXEC_DONE;
 }
@@ -198,7 +242,41 @@ CmdExecStatus
 DBPrintCmd::exec(const string& option)
 {  
    // TODO...
+   string token;
+   bool find = false;
+   if(!dbjson)
+   { 
+        cerr << "Error: DB is not created yet!!" << endl;
+        return CMD_EXEC_DONE;
+   }
+   if(option.empty())
+   {
+        dbjson.print();
+        return CMD_EXEC_DONE;
+   }
+   
 
+
+        if(CmdExec::lexSingleOption(option,token,true))
+        {
+                if(!isValidVarName(token))
+                {
+                        cerr << "Error: Illegal option!! (" << token << ")" << endl;
+                } 
+                else
+                {
+                        for(size_t i = 0; i < dbjson.size(); i ++)
+                        {
+                                if( dbjson[i].key() == token)
+                                {
+                                cout << "{ \"" <<  dbjson[i].key() << "\" : " << dbjson[i].value() << " }" << endl;          
+                                find = true;
+                                }
+                        }
+                        if(find == false)
+                                cerr << "Error: No JSON element with key \"" << token << "\" is found." << endl;
+                }
+        }  
    return CMD_EXEC_DONE;
 }
 
@@ -223,6 +301,7 @@ CmdExecStatus
 DBReadCmd::exec(const string& option)
 {
    // check option
+
    vector<string> options;
    if (!CmdExec::lexOptions(option, options))
       return CMD_EXEC_ERROR;
@@ -249,8 +328,8 @@ DBReadCmd::exec(const string& option)
       cerr << "Error: \"" << fileName << "\" does not exist!!" << endl;
       return CMD_EXEC_ERROR;
    }
-
-   if (dbjson) {
+       
+   if (dbjson) { 
       if (!doReplace) {
          cerr << "Error: DB exists. Use \"-Replace\" option for "
               << "replacement.\n";
@@ -259,10 +338,14 @@ DBReadCmd::exec(const string& option)
       cout << "DB is replaced..." << endl;
       dbjson.reset();
    }
+
+   
 //   if (!(ifs >> dbtbl)) return CMD_EXEC_ERROR;
    ifs >> dbjson;
    cout << "\"" << fileName << "\" was read in successfully." << endl;
-
+       
+       
+     
    return CMD_EXEC_DONE;
 }
 

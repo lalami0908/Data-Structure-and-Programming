@@ -47,11 +47,11 @@ private:                                                                    \
 //
 // To promote 't' to the nearest multiple of SIZE_T; 
 // e.g. Let SIZE_T = 8;  toSizeT(7) = 8, toSizeT(12) = 16
-#define toSizeT(t)      0  // TODO
+#define toSizeT(t)      SIZE_T *((t + SIZE_T_1)/SIZE_T)  // TODO
 //
 // To demote 't' to the nearest multiple of SIZE_T
 // e.g. Let SIZE_T = 8;  downtoSizeT(9) = 8, downtoSizeT(100) = 96
-#define downtoSizeT(t)  0  // TODO
+#define downtoSizeT(t)   SIZE_T * (t/SIZE_T)// TODO
 
 // R_SIZE is the size of the recycle list
 #define R_SIZE 256
@@ -89,7 +89,19 @@ class MemBlock
    // 4. Return false if not enough memory
    bool getMem(size_t t, T*& ret) {
       // TODO
+    
+    t = toSizeT(t);
+    if(_ptr + t >_end) //>=???
+    {
+      ret = (T*)_ptr; 
+      return false;
+    }
+    else
+    {
+      ret = (T*)_ptr;
+      _ptr += t;
       return true;
+    }
    }
    size_t getRemainSize() const { return size_t(_end - _ptr); }
       
@@ -120,18 +132,50 @@ class MemRecycleList
    MemRecycleList<T>* getNextList() const { return _nextList; }
    void setNextList(MemRecycleList<T>* l) { _nextList = l; }
    // pop out the first element in the recycle list
-   T* popFront() {
+   T* popFront() 
+   {
       // TODO
-      return 0;
+    if(_first != 0)
+    {
+			T* temp = _first;
+			_first = *(T **)_first;//?? what will happen when there are only one element??
+			return temp;
+		}
+		return _first;
    }
    // push the element 'p' to the beginning of the recycle list
    void  pushFront(T* p) {
       // TODO
+    
+    T* temp = _first;
+    _first = p;
+    *(T**)_first = temp;//??
    }
    // Release the memory occupied by the recycle list(s)
    // DO NOT release the memory occupied by MemMgr/MemBlock
    void reset() {
       // TODO
+      /*  
+      MemRecycleList<T>* cur = this;
+      MemRecycleList<T>* old;
+      while (cur != 0)	
+      {
+        T* temp = cur -> _first;
+        while(temp != 0)
+        {
+          cur-> popFront();
+          temp = cur -> _first;
+        }
+        old = cur;
+        cur = cur-> getNextList();
+			  delete old;
+        old = 0;// or delete recyclelist??
+      }*/
+      
+      _first = 0;
+      delete _nextList;
+      _nextList = 0;
+    
    }
 
    // Helper functions
@@ -139,8 +183,22 @@ class MemRecycleList
    // count the number of elements in the recycle list
    size_t numElm() const {
       // TODO
+    size_t count = 0;
+  
+    T* p;
+    if(_first != 0)
+      p = _first;
+    else if(_first == 0)
       return 0;
-   }
+
+    while (p) 
+    {
+      p = *(T**)p;
+      count++;
+    }
+   
+    return count;   
+  }
 
    // Data members
    size_t              _arrSize;   // the array size of the recycled data
@@ -171,11 +229,51 @@ public:
    //    if (b != _blockSize) reallocate the memory for the first MemBlock
    // 4. Update the _activeBlock pointer
    void reset(size_t b = 0) {
-      assert(b % SIZE_T == 0);
+      assert(b % SIZE_T == 0);//??
       #ifdef MEM_DEBUG
       cout << "Resetting memMgr...(" << b << ")" << endl;
       #endif // MEM_DEBUG
+
       // TODO
+      MemBlock<T>* p = _activeBlock;
+      MemBlock<T>* temp;
+      while(p)
+      {
+        temp = p;
+
+        if(p-> getNextBlock())
+        {
+          p = p-> getNextBlock();
+          delete temp;
+          temp = 0;
+        }
+        else
+          break;
+      }
+      
+      _activeBlock = p;
+      _activeBlock->reset();
+    //  cout << "_ptr = " <<_activeBlock->_ptr << endl;
+    //  cout << "_end = " <<_activeBlock->_end << endl;
+    //  cout << "test = " <<_activeBlock->getRemainSize() << endl;
+      _activeBlock->_nextBlock = 0;
+     // cout << "hi" << endl;
+
+      for(size_t i = 0;i < R_SIZE;i++)
+          _recycleList[i].reset();
+      
+      
+     // cout << "hi" << endl;
+      //?? mutiple?? blocksize
+
+      if(b!= 0 && b!=_blockSize)
+      {
+        //  delete _activeBlock;
+        //  _activeBlock = 0;
+          _blockSize = b;
+          _activeBlock = new MemBlock<T>(0,_blockSize);
+      }
+   //   cout << "hi" << endl;
    }
    // Called by new
    T* alloc(size_t t) {
@@ -205,14 +303,20 @@ public:
       #ifdef MEM_DEBUG
       cout << "Calling freeArr...(" << p << ")" << endl;
       #endif // MEM_DEBUG
+
       // TODO
+
       // Get the array size 'n' stored by system,
       // which is also the _recycleList index
-      size_t n = 0;
+      size_t n = *(size_t*)p;//??
+
+
       #ifdef MEM_DEBUG
       cout << ">> Array size = " << n << endl;
       cout << "Recycling " << p << " to _recycleList[" << n << "]" << endl;
       #endif // MEM_DEBUG
+      
+      
       // add to recycle list...
       getMemRecycleList(n)->pushFront(p);
    }
@@ -241,7 +345,6 @@ public:
       }
       cout << endl;
    }
-
 private:
    size_t                     _blockSize;
    MemBlock<T>*               _activeBlock;
@@ -259,7 +362,13 @@ private:
       assert(t % SIZE_T == 0);
       assert(t >= S);
       // TODO
-      return 0;
+      
+      //we know
+      //S sizeof(T)
+      //SIZE_T sizeof(size_t)
+
+      return (t - SIZE_T)/S;//??
+     
    }
    // Go through _recycleList[m], its _nextList, and _nexList->_nextList, etc,
    //    to find a recycle list whose "_arrSize" == "n"
@@ -268,11 +377,26 @@ private:
    // So, should never return NULL
    // [Note]: This function will be called by MemMgr->getMem() to get the
    //         recycle list. Therefore, the recycle list is first created
-   //         by the MTNew command, not MTDelete.
+   //         by the MTNew command, not MTDelete.//??
    MemRecycleList<T>* getMemRecycleList(size_t n) {
       size_t m = n % R_SIZE;
+
       // TODO
-      return 0;
+      MemRecycleList<T>* cur = &_recycleList[m];
+    
+      while(cur)
+      {
+        if(cur-> getArrSize() == n) 
+    	    return cur;
+        if(cur -> getNextList()!= 0 )
+          cur = cur -> getNextList();
+        else 
+          break;   
+      }
+      //not found
+      cur -> setNextList(new MemRecycleList<T>(n));
+      return cur->getNextList(); 
+  
    }
    // t is the #Bytes requested from new or new[]
    // Note: Make sure the returned memory is a multiple of SIZE_T
@@ -289,6 +413,19 @@ private:
       //    cerr << "Requested memory (" << t << ") is greater than block size"
       //         << "(" << _blockSize << "). " << "Exception raised...\n";
       // TODO
+     //try throw catch??
+    /// try{        
+         if(t >_blockSize) 
+         {
+            cerr << "Requested memory (" << t << ") is greater than block size"
+               << "(" << _blockSize << "). " << "Exception raised...\n";
+            throw std::bad_alloc();
+         }
+    //  }
+    //  catch(std::bad_alloc& ba){
+    //     throw std::bad_alloc();    
+    //  }
+      
 
       // 3. Check the _recycleList first...
       //    Print this message for memTest.debug
@@ -298,7 +435,18 @@ private:
       //    => 'n' is the size of array
       //    => "ret" is the return address
       size_t n = getArraySize(t);
-      // TODO
+      // TODO //??????//take from R_List
+
+       if(getMemRecycleList( n)->numElm() !=0)
+       {    
+         ret = getMemRecycleList(n)->popFront();
+
+         #ifdef MEM_DEBUG
+         cout << "Recycled from _recycleList[" << n << "]..." << ret << endl;
+         #endif // MEM_DEBUG
+
+         return ret;
+       }
 
       // If no match from recycle list...
       // 4. Get the memory from _activeBlock
@@ -314,8 +462,36 @@ private:
       //    cout << "New MemBlock... " << _activeBlock << endl;
       //    #endif // MEM_DEBUG
       // TODO
+     
 
+      if(!_activeBlock->getMem(t,ret))
+      {                         //take from block  
+            //  cout << "here" << endl;   
+              size_t rn = _activeBlock->getRemainSize();
+                     
+              if(rn >= toSizeT(S)) 
+              {
+                
+          
+                rn = getArraySize(toSizeT(rn));
+                getMemRecycleList(rn)->pushFront(ret);// ??????? ok ret from getmem =_=
+                  
+                  #ifdef MEM_DEBUG
+                  cout << "Recycling " << ret << " to _recycleList[" << rn << "]\n";
+                  #endif //MEM_DEBUG
+              }
+              
+              MemBlock<T>* new_block =new MemBlock<T>(_activeBlock,_blockSize);
+              _activeBlock = new_block;
+              _activeBlock->getMem(t,ret); //memBlock's getMem!!!!
+
+              #ifdef MEM_DEBUG
+              cout << "New MemBlock... " << _activeBlock << endl;
+              #endif //MEM_DEBUG
+      }
       // 6. At the end, print out the acquired memory address
+
+
       #ifdef MEM_DEBUG
       cout << "Memory acquired... " << ret << endl;
       #endif // MEM_DEBUG
@@ -324,9 +500,19 @@ private:
    // Get the currently allocated number of MemBlock's
    size_t getNumBlocks() const {
       // TODO
-      return 0;
+      size_t count = 0;
+      
+      if(_activeBlock)
+      {
+        count = 1;
+        MemBlock<T>* cur = _activeBlock;
+    
+        while((cur = cur->_nextBlock) != 0)
+          count++;
+      }
+      
+      return count;   
    }
-
 };
 
 #endif // MEM_MGR_H
